@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Get Dependabot alerts
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_DEPENDABOT_TOKEN }}
+          GH_TOKEN: ${{ secrets.DEPENDABOT_TOKEN }}
         run: |
           curl --fail \
             -L \
