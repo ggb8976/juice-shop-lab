@@ -17,34 +17,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript-typescript' ]
+        language: ['javascript-typescript']
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-        queries: security-extended
-        config: |
-          paths-ignore:
-            - 'data/static/codefixes'
-          query-filters:
-          - exclude:
-               id: js/missing-rate-limiting
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - 'data/static/codefixes'
+            query-filters:
+              - exclude:
+                  id: js/missing-rate-limiting
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-      with:
-        output: ${{ runner.temp }}/codeql-results
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: ${{ runner.temp }}/codeql-results
 
-    - name: Upload CodeQL SARIF
-      uses: actions/upload-artifact@v4
-      with:
-        name: codeql-sarif
-        path: ${{ runner.temp }}/codeql-results
+      - name: Upload CodeQL SARIF
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif
+          path: ${{ runner.temp }}/codeql-results
+
+      - name: Upload CodeQL SARIF to DefectDojo
+        if: always()
+        run: |
+          curl --fail -X POST \
+            "${{ secrets.DEFECTDOJO_URL }}/api/v2/reimport-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_API_TOKEN }}" \
+            -F "scan_type=SARIF" \
+            -F "file=@${{ runner.temp }}/codeql-results/javascript.sarif" \
+            -F "product_name=JuiceSHop" \
+            -F "engagement_name=GitHub Actions" \
+            -F "auto_create_context=true"
