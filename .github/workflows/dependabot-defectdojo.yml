@@ -1,0 +1,82 @@
+name: "Dependabot → DefectDojo"
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Dependabot alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail \
+            -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/${{ github.repository }}/dependabot/alerts?state=open&per_page=100" \
+            -o dependabot.json
+
+      - name: Convert to DefectDojo format
+        run: |
+          python - <<'PY'
+          import json
+
+          with open("dependabot.json") as f:
+              alerts = json.load(f)
+
+          findings = []
+
+          for alert in alerts:
+              advisory = alert.get("security_advisory") or {}
+              dependency = alert.get("dependency", {})
+              package = dependency.get("package", {})
+
+              severity = (advisory.get("severity") or "Info").capitalize()
+
+              if severity not in ["Info", "Low", "Medium", "High", "Critical"]:
+                  severity = "Info"
+
+              findings.append({
+                  "title": advisory.get("summary") or "Dependabot vulnerability",
+                  "severity": severity,
+                  "description": advisory.get("description") or "",
+                  "mitigation": "",
+                  "references": advisory.get("references", []),
+                  "file_path": dependency.get("manifest_path", ""),
+                  "component_name": package.get("name", ""),
+                  "unique_id_from_tool": (
+                      advisory.get("ghsa_id")
+                      or str(alert.get("number"))
+                  )
+              })
+
+          report = {
+              "name": "Dependabot",
+              "type": "Dependabot",
+              "findings": findings
+          }
+
+          with open("dependabot-defectdojo.json", "w") as f:
+              json.dump(report, f, indent=2)
+          PY
+
+      - name: Upload to DefectDojo
+        run: |
+          curl --fail -X POST \
+            "${{ secrets.DEFECTDOJO_URL }}/api/v2/reimport-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_API_TOKEN }}" \
+            -F "scan_type=Generic Findings Import" \
+            -F "file=@dependabot-defectdojo.json" \
+            -F "product_name=JuiceSHop" \
+            -F "engagement_name=GitHub Actions" \
+            -F "auto_create_context=true"
