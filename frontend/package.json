@@ -53,7 +53,7 @@
     "lodash-es": "^4.17.21",
     "material-icons": "^1.13.14",
     "ng-gallery": "^12.0.0",
-    "ng2-file-upload": "^10.0.0",
+    "ng2-file-upload": "^12.0.0",
     "ngx-window-token": "^7.0.0",
     "ngy-cookie": "^6.0.0",
     "rxjs": "7.8.2",
